@@ -1,0 +1,1996 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cantiere Casa v2 - Gestione Ristrutturazione</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Vue.js 3 CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#F0F7FF',
+                            100: '#E0EFFE',
+                            500: '#0284C7',
+                            600: '#0369A1',
+                            700: '#075985',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F8FAFC;
+            color: #0F172A;
+            -webkit-tap-highlight-color: transparent;
+            padding-bottom: 70px; /* Spazio per tabbar mobile */
+        }
+        @media (min-width: 768px) {
+            body { padding-bottom: 20px; }
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #F1F5F9; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+        .tab-active {
+            color: #0284C7;
+            border-bottom: 3px solid #0284C7;
+            font-weight: 700;
+        }
+        .mobile-tab-active {
+            color: #0284C7;
+            font-weight: 700;
+        }
+        .card-shadow {
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+        }
+        .card-hover {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .card-hover:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -4px rgba(0, 0, 0, 0.02);
+        }
+        [v-cloak] { display: none; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col">
+    <div id="app" v-cloak class="flex-1 flex flex-col max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-3">
+
+        <!-- HEADER PRINCIPALE DESKTOP & MOBILE -->
+        <header class="bg-white rounded-2xl p-4 mb-4 card-shadow border border-slate-200/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-sky-600 flex items-center justify-center text-white shadow-md shadow-sky-200">
+                        <i class="fa-solid fa-house-chimney-crack text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h1 class="text-xl font-black text-slate-800 tracking-tight">Cantiere Casa</h1>
+                            <span class="bg-sky-100 text-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-full">v2 AI</span>
+                        </div>
+                        <p class="text-xs text-slate-500 font-medium">Gestione Operativa Ristrutturazione</p>
+                    </div>
+                </div>
+
+                <!-- Action Buttons Mobile -->
+                <div class="flex items-center space-x-2 md:hidden">
+                    <button @click="showQuickAiModal = true" class="bg-gradient-to-r from-indigo-600 to-sky-600 text-white px-3 py-2 rounded-xl text-xs font-bold shadow flex items-center gap-1.5">
+                        <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i> AI
+                    </button>
+                    <button @click="openNewTaskModal" class="bg-sky-600 text-white p-2.5 rounded-xl text-xs font-bold shadow">
+                        <i class="fa-solid fa-plus"></i>
+                    </button>
+                    <button @click="showSettingsModal = true" class="text-slate-600 p-2 rounded-xl border border-slate-200">
+                        <i class="fa-solid fa-gear"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- TABS DI NAVIGAZIONE (DESKTOP) -->
+            <nav class="hidden md:flex space-x-2 border-b border-slate-100 pb-1">
+                <button @click="currentTab = 'domani'" 
+                        :class="['px-3 py-2 text-sm whitespace-nowrap transition flex items-center gap-2', currentTab === 'domani' ? 'tab-active' : 'text-slate-600 hover:text-slate-900']">
+                    <i class="fa-solid fa-bolt text-amber-500"></i>
+                    <span>⚡ Domani</span>
+                    <span v-if="readyTasksCount > 0" class="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded-full font-bold">
+                        {{ readyTasksCount }}
+                    </span>
+                </button>
+
+                <button @click="currentTab = 'tutti'" 
+                        :class="['px-3 py-2 text-sm whitespace-nowrap transition flex items-center gap-2', currentTab === 'tutti' ? 'tab-active' : 'text-slate-600 hover:text-slate-900']">
+                    <i class="fa-solid fa-list-check"></i>
+                    <span>📋 Lavori</span>
+                    <span class="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full">{{ tasks.length }}</span>
+                </button>
+
+                <button @click="currentTab = 'spesa'" 
+                        :class="['px-3 py-2 text-sm whitespace-nowrap transition flex items-center gap-2', currentTab === 'spesa' ? 'tab-active' : 'text-slate-600 hover:text-slate-900']">
+                    <i class="fa-solid fa-cart-shopping text-sky-600"></i>
+                    <span>🛒 Lista Spesa</span>
+                    <span v-if="missingMaterialsCount > 0" class="text-xs bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">
+                        {{ missingMaterialsCount }}
+                    </span>
+                </button>
+
+                <button @click="currentTab = 'ditte'" 
+                        :class="['px-3 py-2 text-sm whitespace-nowrap transition flex items-center gap-2', currentTab === 'ditte' ? 'tab-active' : 'text-slate-600 hover:text-slate-900']">
+                    <i class="fa-solid fa-user-gear text-indigo-600"></i>
+                    <span>👷 Ditte</span>
+                </button>
+
+                <button @click="currentTab = 'budget'" 
+                        :class="['px-3 py-2 text-sm whitespace-nowrap transition flex items-center gap-2', currentTab === 'budget' ? 'tab-active' : 'text-slate-600 hover:text-slate-900']">
+                    <i class="fa-solid fa-chart-pie"></i>
+                    <span>📊 Budget</span>
+                </button>
+            </nav>
+
+            <!-- AZIONI DESKTOP -->
+            <div class="hidden md:flex items-center space-x-2">
+                <button @click="showQuickAiModal = true" class="bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-700 hover:to-sky-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-2">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i> ✨ Inserimento AI
+                </button>
+                <button @click="openNewTaskModal" class="bg-sky-600 hover:bg-sky-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-plus"></i> Nuovo Lavoro
+                </button>
+                <button @click="showSettingsModal = true" class="bg-slate-100 hover:bg-slate-200 text-slate-700 p-2 rounded-xl text-xs font-medium transition" title="Impostazioni ed Esportazione">
+                    <i class="fa-solid fa-gear text-base"></i>
+                </button>
+            </div>
+        </header>
+
+
+        <!-- TAB 1: DOMANI (VISTA OPERATIVA GIORNALIERA) -->
+        <div v-if="currentTab === 'domani'" class="space-y-5">
+            
+            <!-- BARRA FILTRI OPERATIVI PER DOMANI -->
+            <div class="bg-white rounded-2xl p-4 card-shadow border border-slate-200/80 flex flex-col sm:flex-row justify-between gap-3 items-start sm:items-center">
+                <div class="flex items-center gap-2 flex-wrap text-xs">
+                    <span class="font-bold text-slate-500 uppercase">Meteo:</span>
+                    <button v-for="m in ['Tutti', 'Interno', 'Esterno']" :key="m"
+                            @click="domaniWeatherFilter = m"
+                            :class="['px-2.5 py-1.5 rounded-xl font-semibold transition flex items-center gap-1 border',
+                                     domaniWeatherFilter === m ? 'bg-slate-800 text-white border-slate-800' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100']">
+                        <span v-if="m === 'Interno'">🏠 Solo al coperto</span>
+                        <span v-else-if="m === 'Esterno'">☀️ All'esterno</span>
+                        <span v-else>Tutti</span>
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2 flex-wrap text-xs">
+                    <span class="font-bold text-slate-500 uppercase">Durata max:</span>
+                    <select v-model="domaniDurationFilter" class="bg-slate-50 border border-slate-200 rounded-xl px-2.5 py-1.5 font-semibold text-slate-700">
+                        <option value="Tutte">Qualsiasi durata</option>
+                        <option value="30m">≤ 30 minuti</option>
+                        <option value="2h">≤ 2 ore</option>
+                        <option value="½ giornata">≤ ½ giornata</option>
+                        <option value="1 giorno">1 giorno</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- BOX CONSIGLIERE AI GEMINI -->
+            <div class="bg-gradient-to-br from-indigo-950 via-slate-900 to-sky-950 rounded-2xl p-4 sm:p-5 text-white shadow-lg border border-indigo-900/50">
+                <div class="flex items-center justify-between mb-2">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-8 h-8 rounded-lg bg-indigo-500/30 flex items-center justify-center border border-indigo-400/30">
+                            <i class="fa-solid fa-wand-magic-sparkles text-amber-300"></i>
+                        </div>
+                        <h2 class="font-bold text-base sm:text-lg tracking-tight">Consigliere AI: Cosa faccio domani?</h2>
+                    </div>
+                    <span class="text-[10px] bg-sky-500/20 text-sky-300 border border-sky-400/30 px-2 py-0.5 rounded-full font-mono">Gemini AI</span>
+                </div>
+                <p class="text-xs text-slate-300 mb-3">Descrivi il tempo a disposizione o le tue condizioni (es. piove, rumore limitato, 2 ore libere) per ricevere un piano di lavoro personalizzato.</p>
+
+                <!-- Prompt presets -->
+                <div class="flex flex-wrap gap-1.5 mb-3">
+                    <button @click="aiConsiglierePrompt = 'Piove e ho 2 ore libere dopo il lavoro'" class="bg-white/10 hover:bg-white/20 text-slate-200 text-xs px-2.5 py-1 rounded-lg border border-white/10">
+                        🌧️ Piove + 2 ore
+                    </button>
+                    <button @click="aiConsiglierePrompt = 'Ho tutta la giornata di domani da dedicare al cantiere fai da te'" class="bg-white/10 hover:bg-white/20 text-slate-200 text-xs px-2.5 py-1 rounded-lg border border-white/10">
+                        🛠️ Giornata intera
+                    </button>
+                    <button @click="aiConsiglierePrompt = 'Solo lavori silenziosi senza fare troppo rumore'" class="bg-white/10 hover:bg-white/20 text-slate-200 text-xs px-2.5 py-1 rounded-lg border border-white/10">
+                        🤫 Lavori silenziosi
+                    </button>
+                </div>
+
+                <div class="flex gap-2">
+                    <input type="text" v-model="aiConsiglierePrompt" placeholder="Es. Ho 3 ore domani mattina al coperto..." 
+                           class="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-sky-400">
+                    <button @click="askGeminiAdvice" :disabled="isGeminiThinking" 
+                            class="bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 disabled:opacity-50">
+                        <i v-if="isGeminiThinking" class="fa-solid fa-spinner animate-spin"></i>
+                        <i v-else class="fa-solid fa-paper-plane"></i>
+                        <span>Chiedi</span>
+                    </button>
+                </div>
+
+                <!-- Gemini Advice Output -->
+                <div v-if="geminiAdviceResult" class="mt-4 p-3 bg-white/10 border border-white/15 rounded-xl text-xs space-y-2 leading-relaxed">
+                    <div class="font-bold text-amber-300 flex items-center justify-between">
+                        <span><i class="fa-solid fa-lightbulb mr-1"></i> Piano Consigliato da Gemini:</span>
+                        <button @click="geminiAdviceResult = null" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <div class="whitespace-pre-line text-slate-100">{{ geminiAdviceResult }}</div>
+                </div>
+            </div>
+
+            <!-- SEZIONE 1: PRONTI PER DOMANI (FAI DA TE) -->
+            <section class="bg-white rounded-2xl p-4 sm:p-5 card-shadow border border-slate-200/80">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-2">
+                        <span class="flex h-3 w-3 relative">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                        </span>
+                        <h2 class="text-lg font-bold text-slate-800">🟢 Pronti per Domani (Fai da te)</h2>
+                    </div>
+                    <span class="text-xs bg-emerald-50 text-emerald-700 font-semibold px-2.5 py-1 rounded-full border border-emerald-200">
+                        {{ readyTasksFiltered.length }} sbloccati
+                    </span>
+                </div>
+
+                <div v-if="readyTasksFiltered.length > 0" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div v-for="task in readyTasksFiltered" :key="task.id" 
+                         @click="openTaskModal(task)"
+                         class="border border-slate-200 rounded-xl p-4 hover:border-sky-300 card-hover bg-slate-50/40 cursor-pointer flex flex-col justify-between">
+                        <div>
+                            <div class="flex items-start justify-between gap-2 mb-2">
+                                <div class="flex items-center gap-1.5 flex-wrap">
+                                    <span :class="getPriorityBadgeClass(task.priority)" class="text-xs px-2 py-0.5 rounded font-bold">
+                                        {{ task.priority }}
+                                    </span>
+                                    <span class="text-xs bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded font-medium">
+                                        {{ task.environment }}
+                                    </span>
+                                    <span class="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                                        {{ task.weather === 'Interno' ? '🏠 Interno' : '☀️ Esterno' }}
+                                    </span>
+                                    <span class="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                                        ⏱️ {{ task.duration || '1h' }}
+                                    </span>
+                                </div>
+                                <span :class="getStatusBadgeClass(task.status)" class="text-xs px-2 py-0.5 rounded-full font-semibold">
+                                    {{ task.status }}
+                                </span>
+                            </div>
+
+                            <h3 class="font-bold text-slate-800 text-base mb-1 hover:text-sky-600 transition">
+                                {{ task.title }}
+                            </h3>
+
+                            <!-- Note o attrezzi -->
+                            <div class="text-xs text-slate-500 space-y-1 mb-2">
+                                <p v-if="task.notes" class="italic truncate"><i class="fa-regular fa-comment-dots mr-1"></i>{{ task.notes }}</p>
+                                <div v-if="task.tools && task.tools.length > 0" class="flex flex-wrap gap-1">
+                                    <span v-for="t in task.tools" :key="t.name" class="text-[10px] bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.2 rounded font-medium">
+                                        🛠️ {{ t.name }} <span v-if="t.status.includes('noleggiare')" class="text-rose-600 font-bold">(da noleggiare)</span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Subtasks summary -->
+                            <div v-if="task.subtasks && task.subtasks.length > 0" class="mb-3">
+                                <div class="flex justify-between text-xs text-slate-500 mb-1">
+                                    <span>Sotto-lavori: {{ getCompletedSubtasksCount(task) }}/{{ task.subtasks.length }}</span>
+                                    <span>{{ getSubtasksProgress(task) }}%</span>
+                                </div>
+                                <div class="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                                    <div class="bg-sky-500 h-full" :style="{ width: getSubtasksProgress(task) + '%' }"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="pt-3 mt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
+                            <span class="text-emerald-700 font-semibold flex items-center gap-1">
+                                <i class="fa-solid fa-box-open text-emerald-500"></i>
+                                {{ getMaterialStatusText(task) }}
+                            </span>
+
+                            <div class="flex items-center space-x-2" @click.stop>
+                                <button v-if="task.status === 'Non iniziata'" 
+                                        @click="updateTaskStatus(task, 'In corso')" 
+                                        class="bg-sky-600 hover:bg-sky-700 text-white px-3 py-1 rounded-lg font-medium transition flex items-center gap-1">
+                                    <i class="fa-solid fa-play text-xs"></i> Inizia
+                                </button>
+                                <button v-if="task.status === 'In corso'" 
+                                        @click="updateTaskStatus(task, 'Completata')" 
+                                        class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded-lg font-medium transition flex items-center gap-1">
+                                    <i class="fa-solid fa-check text-xs"></i> Completa
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-else class="text-center py-8 text-slate-400 text-sm">
+                    <i class="fa-solid fa-clipboard-check text-4xl mb-2 text-slate-300"></i>
+                    <p>Nessun lavoro corrisponde ai filtri selezionati. Prova a modificare meteo/durata o spunta i materiali mancanti!</p>
+                </div>
+            </section>
+
+            <!-- SEZIONE 2: BLOCCATI DAI MATERIALI -->
+            <section class="bg-white rounded-2xl p-4 sm:p-5 card-shadow border border-slate-200/80">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-cart-shopping text-amber-500 text-base"></i>
+                        <h2 class="text-base sm:text-lg font-bold text-slate-800">🟡 Bloccati dai Materiali (spunta per sbloccare)</h2>
+                    </div>
+                    <span class="text-xs bg-amber-50 text-amber-700 font-semibold px-2.5 py-1 rounded-full border border-amber-200">
+                        {{ blockedTasks.length }} In attesa
+                    </span>
+                </div>
+
+                <div v-if="blockedTasks.length > 0" class="space-y-3">
+                    <div v-for="task in blockedTasks" :key="task.id" 
+                         class="border border-amber-200/80 bg-amber-50/20 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="flex-1 cursor-pointer" @click="openTaskModal(task)">
+                            <div class="flex items-center gap-2 mb-1 flex-wrap">
+                                <span :class="getPriorityBadgeClass(task.priority)" class="text-[11px] px-2 py-0.5 rounded font-bold">
+                                    {{ task.priority }}
+                                </span>
+                                <span class="font-bold text-slate-800 text-sm sm:text-base hover:text-sky-600 transition">{{ task.title }}</span>
+                                <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">{{ task.environment }}</span>
+                            </div>
+
+                            <div class="mt-2 flex flex-wrap gap-2">
+                                <div v-for="(mat, idx) in getMissingMaterials(task)" :key="idx" 
+                                     @click.stop="toggleMaterialInHouse(task, mat)"
+                                     class="bg-white border border-amber-300 hover:border-emerald-500 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-700 flex items-center gap-2 cursor-pointer shadow-sm transition">
+                                    <i class="fa-regular fa-square text-amber-500 hover:text-emerald-500"></i>
+                                    <span>{{ mat.name }} <span v-if="mat.quantity" class="text-slate-400">({{ mat.quantity }})</span></span>
+                                    <span class="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.2 rounded font-bold">{{ mat.store }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-else class="text-center py-4 text-slate-400 text-xs">
+                    <i class="fa-solid fa-circle-check text-emerald-500 mr-1"></i> Ottimo! Nessun lavoro Fai da te è in attesa di materiali.
+                </div>
+            </section>
+
+            <!-- SEZIONE 3: BLOCCATI DA DIPENDENZE -->
+            <section v-if="dependencyBlockedTasks.length > 0" class="bg-white rounded-2xl p-4 sm:p-5 card-shadow border border-slate-200/80">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-2">
+                        <i class="fa-solid fa-lock text-rose-500 text-base"></i>
+                        <h2 class="text-base font-bold text-slate-800">🔒 Bloccati da Altri Lavori (Dipendenze)</h2>
+                    </div>
+                </div>
+
+                <div class="space-y-2">
+                    <div v-for="task in dependencyBlockedTasks" :key="task.id" class="p-3 bg-rose-50/40 border border-rose-200/60 rounded-xl text-xs flex justify-between items-center">
+                        <div>
+                            <span class="font-bold text-slate-800 text-sm">{{ task.title }}</span>
+                            <div class="text-slate-500 mt-0.5">
+                                In attesa del completamento di: <strong class="text-rose-700">{{ getParentTaskTitle(task.dependsOn) }}</strong>
+                            </div>
+                        </div>
+                        <button @click="openTaskModal(task)" class="text-sky-600 hover:underline font-semibold">Vedi</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SEZIONE 4: ARTIGIANI & DITTE IN CORSO -->
+            <section class="bg-white rounded-2xl p-4 sm:p-5 card-shadow border border-slate-200/80">
+                <h2 class="text-base font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-user-gear text-slate-500"></i> Lavori in corso con Ditte ed Artigiani
+                </h2>
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                    <div v-for="task in ditteTasksActive" :key="task.id" 
+                         @click="openTaskModal(task)"
+                         class="border border-slate-200 rounded-xl p-3 bg-slate-50 cursor-pointer hover:border-slate-300">
+                        <div class="flex justify-between items-start mb-1">
+                            <span class="font-bold text-sm text-slate-800">{{ task.title }}</span>
+                            <span :class="getPriorityBadgeClass(task.priority)" class="text-[10px] px-1.5 py-0.5 rounded font-bold">
+                                {{ task.priority }}
+                            </span>
+                        </div>
+                        <div class="text-xs text-slate-500 flex justify-between items-center mt-2">
+                            <span><i class="fa-solid fa-helmet-safety text-amber-600 mr-1"></i>{{ task.assignee }}</span>
+                            <span class="bg-sky-100 text-sky-800 font-semibold px-2 py-0.5 rounded-full">{{ task.status }}</span>
+                        </div>
+                    </div>
+                    <div v-if="ditteTasksActive.length === 0" class="col-span-full text-slate-400 text-xs py-2">
+                        Nessun lavoro affidato a ditte in questo momento.
+                    </div>
+                </div>
+            </section>
+
+        </div>
+
+
+        <!-- TAB 2: LAVORI (LISTA COMPLETA & FILTRI) -->
+        <div v-if="currentTab === 'tutti'" class="space-y-4">
+            
+            <div class="bg-white rounded-2xl p-4 card-shadow border border-slate-200/80 space-y-3">
+                <div class="flex flex-col md:flex-row gap-3 justify-between">
+                    <div class="relative flex-1">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400"></i>
+                        <input type="text" v-model="searchQuery" placeholder="Cerca lavoro, materiale, ambiente..." 
+                               class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-sky-500">
+                    </div>
+
+                    <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl text-xs font-semibold overflow-x-auto">
+                        <button v-for="opt in ['Tutti', 'Fai da te', 'Ditte / Artigiani']" :key="opt"
+                                @click="filterAssigneeGroup = opt"
+                                :class="['px-3 py-1.5 rounded-lg whitespace-nowrap transition', filterAssigneeGroup === opt ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-600 hover:text-slate-900']">
+                            {{ opt }}
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Secondary Filters Row -->
+                <div class="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-slate-100 text-xs">
+                    <div>
+                        <label class="font-bold text-slate-400 uppercase block mb-1">Stato</label>
+                        <select v-model="filterStatus" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700">
+                            <option value="Tutti">Tutti</option>
+                            <option value="Aperti">Solo Aperti</option>
+                            <option value="Non iniziata">Non iniziata</option>
+                            <option value="In corso">In corso</option>
+                            <option value="In attesa preventivo">In attesa preventivo</option>
+                            <option value="Completata">Completata</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-slate-400 uppercase block mb-1">Priorità</label>
+                        <select v-model="filterPriority" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700">
+                            <option value="Tutti">Tutte</option>
+                            <option value="P0">P0 (Urgente)</option>
+                            <option value="P1">P1 (Alta)</option>
+                            <option value="P2">P2 (Media)</option>
+                            <option value="P3">P3 (Bassa)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-slate-400 uppercase block mb-1">Ambiente</label>
+                        <select v-model="filterEnvironment" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700">
+                            <option value="Tutti">Tutti</option>
+                            <option v-for="env in environmentsList" :key="env" :value="env">{{ env }}</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-slate-400 uppercase block mb-1">Meteo</label>
+                        <select v-model="filterWeather" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700">
+                            <option value="Tutti">Tutti</option>
+                            <option value="Interno">🏠 Interno</option>
+                            <option value="Esterno">☀️ Esterno</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-slate-400 uppercase block mb-1">Materiali</label>
+                        <select v-model="filterMaterialStatus" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-700">
+                            <option value="Tutti">Tutti</option>
+                            <option value="Pronti in casa">🟢 Pronti</option>
+                            <option value="Da comprare">🟡 Da comprare</option>
+                            <option value="Non servono">⚪ Non servono</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Header lista -->
+            <div class="flex justify-between items-center px-1 text-xs text-slate-500 font-medium">
+                <span>Visualizzati: {{ filteredTasks.length }} di {{ tasks.length }} lavori</span>
+                <button v-if="hasActiveFilters" @click="resetFilters" class="text-sky-600 hover:underline">Reset Filtri</button>
+            </div>
+
+            <!-- Grid schede -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div v-for="task in filteredTasks" :key="task.id" 
+                     @click="openTaskModal(task)"
+                     class="bg-white rounded-2xl p-4 card-shadow border border-slate-200/80 card-hover cursor-pointer flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-start justify-between gap-2 mb-2">
+                            <div class="flex items-center gap-1 flex-wrap">
+                                <span :class="getPriorityBadgeClass(task.priority)" class="text-[11px] px-2 py-0.5 rounded font-bold">
+                                    {{ task.priority }}
+                                </span>
+                                <span class="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">
+                                    {{ task.environment }}
+                                </span>
+                                <span class="text-[11px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">
+                                    {{ task.weather === 'Interno' ? '🏠' : '☀️' }}
+                                </span>
+                            </div>
+                            <span :class="getStatusBadgeClass(task.status)" class="text-xs px-2 py-0.5 rounded-full font-semibold">
+                                {{ task.status }}
+                            </span>
+                        </div>
+
+                        <h3 class="font-bold text-slate-800 text-base mb-1 hover:text-sky-600 transition">
+                            {{ task.title }}
+                        </h3>
+
+                        <div class="text-xs text-slate-500 space-y-1 mb-3">
+                            <div class="flex items-center gap-1">
+                                <i class="fa-solid fa-user text-slate-400 w-4"></i>
+                                <span class="font-medium text-slate-700">{{ task.assignee }}</span>
+                            </div>
+                            <div v-if="task.dependsOn" class="text-rose-600 font-medium">
+                                <i class="fa-solid fa-link text-xs mr-1"></i>Dipende da: {{ getParentTaskTitle(task.dependsOn) }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                        <span class="text-slate-500">
+                            <i class="fa-solid fa-list-check mr-1 text-slate-400"></i>
+                            {{ getCompletedSubtasksCount(task) }}/{{ task.subtasks ? task.subtasks.length : 0 }}
+                        </span>
+                        <span :class="getMaterialBadgeClass(task)" class="px-2 py-0.5 rounded-md font-semibold text-[11px]">
+                            {{ getMaterialStatusText(task) }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- TAB 3: LISTA SPESA (FILTRI NEGOZIO & COPPA WHATSAPP) -->
+        <div v-if="currentTab === 'spesa'" class="space-y-4">
+            
+            <!-- HEADER LISTA SPESA E BANNER CARRELLO -->
+            <div class="bg-white rounded-2xl p-4 card-shadow border border-slate-200/80 space-y-3">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-cart-shopping text-amber-500"></i> Lista Spesa Materiali
+                        </h2>
+                        <p class="text-xs text-slate-500">Filtra per negozio quando sei in corsia per ottimizzare gli acquisti.</p>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button @click="copyWhatsAppList" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+                            <i class="fa-brands fa-whatsapp text-sm"></i> Copia per WhatsApp
+                        </button>
+                        <button @click="showAddMaterialModal = true" class="bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-plus"></i> Aggiungi Materiale
+                        </button>
+                    </div>
+                </div>
+
+                <!-- BANNER TOTALE CARRELLO STIMATO PER NEGOZIO -->
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 flex justify-between items-center text-xs text-amber-900 font-medium">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-basket-shopping text-amber-600 text-base"></i>
+                        <span>Negozio: <strong>{{ spesaFilterStore }}</strong> ({{ allMaterialsFiltered.length }} articoli)</span>
+                    </div>
+                    <div>
+                        Stima Spesa: <strong class="text-sm font-extrabold">€ {{ formatMoney(totalStoreEstimate) }}</strong>
+                    </div>
+                </div>
+
+                <!-- FILTRO PER NEGOZIO (PILLS) -->
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+                    <button v-for="store in storesList" :key="store"
+                            @click="spesaFilterStore = store"
+                            :class="['px-3 py-1.5 rounded-xl font-semibold whitespace-nowrap transition border',
+                                     spesaFilterStore === store ? 'bg-sky-600 text-white border-sky-600 shadow-sm' : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100']">
+                        {{ store }}
+                        <span class="ml-1 text-[10px] px-1.5 py-0.2 rounded-full" :class="spesaFilterStore === store ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'">
+                            {{ getMaterialCountByStore(store) }}
+                        </span>
+                    </button>
+                </div>
+
+                <!-- FILTRO SECONDARIO STATO -->
+                <div class="flex items-center gap-2 text-xs pt-1 border-t border-slate-100">
+                    <span class="font-bold text-slate-400 uppercase">Stato:</span>
+                    <button v-for="s in ['Tutti', 'Da comprare', 'Ordinato', 'In casa']" :key="s"
+                            @click="spesaFilterStatus = s"
+                            :class="['px-2.5 py-1 rounded-lg transition font-medium', spesaFilterStatus === s ? 'bg-slate-800 text-white' : 'text-slate-600 hover:bg-slate-100']">
+                        {{ s }}
+                    </button>
+                </div>
+            </div>
+
+            <!-- LISTA MATERIALI -->
+            <div class="bg-white rounded-2xl card-shadow border border-slate-200/80 overflow-hidden divide-y divide-slate-100">
+                <div v-for="(item, idx) in allMaterialsFiltered" :key="idx" 
+                     class="p-3 sm:p-4 hover:bg-slate-50 transition flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    
+                    <div class="flex items-start gap-3">
+                        <button @click="cycleMaterialStatus(item.task, item.material)" class="mt-0.5 text-xl hover:scale-110 transition">
+                            <i v-if="item.material.status === 'In casa'" class="fa-solid fa-circle-check text-emerald-500"></i>
+                            <i v-else-if="item.material.status === 'Ordinato'" class="fa-solid fa-clock text-rose-500"></i>
+                            <i v-else class="fa-regular fa-circle text-amber-500"></i>
+                        </button>
+
+                        <div>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-bold text-slate-800 text-sm sm:text-base">{{ item.material.name }}</span>
+                                <span v-if="item.material.quantity" class="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded font-semibold">
+                                    {{ item.material.quantity }}
+                                </span>
+                                <span class="text-xs bg-sky-50 text-sky-700 border border-sky-200 px-2 py-0.5 rounded font-bold">
+                                    🛒 {{ item.material.store || 'Generico' }}
+                                </span>
+                            </div>
+
+                            <!-- Code / Link / Specs -->
+                            <div v-if="item.material.codeUrl" class="text-xs text-slate-500 mt-1">
+                                <i class="fa-solid fa-barcode text-slate-400 mr-1"></i>
+                                <template v-if="isUrl(item.material.codeUrl)">
+                                    <a :href="item.material.codeUrl" target="_blank" class="text-sky-600 hover:underline font-semibold">
+                                        Apri Link Prodotto <i class="fa-solid fa-up-right-from-square text-[10px]"></i>
+                                    </a>
+                                </template>
+                                <template v-else>
+                                    <span>Misura/Cod: <strong>{{ item.material.codeUrl }}</strong></span>
+                                </template>
+                            </div>
+
+                            <div class="text-xs text-slate-400 mt-1">
+                                Lavoro: <strong class="text-slate-600 hover:underline cursor-pointer" @click="openTaskModal(item.task)">{{ item.task.title }}</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-0 border-slate-100">
+                        <span v-if="item.material.cost" class="text-sm font-bold text-slate-700">
+                            € {{ formatMoney(item.material.cost) }}
+                        </span>
+
+                        <select v-model="item.material.status" @change="saveTasks" 
+                                :class="getMaterialStatusSelectClass(item.material.status)"
+                                class="text-xs rounded-lg p-1.5 font-bold border border-slate-200">
+                            <option value="Da comprare">🟡 Da comprare</option>
+                            <option value="Ordinato">🔴 Ordinato</option>
+                            <option value="In casa">🟢 In casa</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div v-if="allMaterialsFiltered.length === 0" class="p-8 text-center text-slate-400">
+                    <i class="fa-solid fa-basket-shopping text-4xl mb-2 text-slate-300"></i>
+                    <p class="text-sm">Nessun materiale trovato per questo negozio o filtro.</p>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- TAB 4: DITTE & ARTIGIANI (RUBRICA) -->
+        <div v-if="currentTab === 'ditte'" class="space-y-4">
+            
+            <div class="bg-white rounded-2xl p-4 card-shadow border border-slate-200/80 flex justify-between items-center">
+                <div>
+                    <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-address-book text-indigo-600"></i> Rubrica Artigiani e Ditte
+                    </h2>
+                    <p class="text-xs text-slate-500">Gestisci i contatti e chiama direttamente dal cantiere.</p>
+                </div>
+                <button @click="openNewContractorModal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold shadow transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-plus"></i> Aggiungi Ditta
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div v-for="c in contractors" :key="c.id" class="bg-white rounded-2xl p-5 card-shadow border border-slate-200/80 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <span class="text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-md uppercase">
+                                    {{ c.role }}
+                                </span>
+                                <h3 class="font-bold text-slate-800 text-lg mt-1">{{ c.name }}</h3>
+                            </div>
+                            <button @click="editContractor(c)" class="text-slate-400 hover:text-slate-600 text-xs p-1">
+                                <i class="fa-solid fa-pen"></i>
+                            </button>
+                        </div>
+
+                        <p v-if="c.phone" class="text-sm text-slate-600 font-semibold mb-2">
+                            <i class="fa-solid fa-phone text-slate-400 mr-1.5"></i>{{ c.phone }}
+                        </p>
+                        <p v-if="c.notes" class="text-xs text-slate-500 italic mb-3">{{ c.notes }}</p>
+
+                        <!-- Lavori assegnati a questa ditta -->
+                        <div class="mt-3 pt-3 border-t border-slate-100">
+                            <span class="text-[11px] font-bold text-slate-400 uppercase block mb-1">Lavori Assegnati ({{ getTasksForContractor(c.role).length }}):</span>
+                            <div class="space-y-1">
+                                <div v-for="t in getTasksForContractor(c.role)" :key="t.id" 
+                                     @click="openTaskModal(t)"
+                                     class="text-xs bg-slate-50 hover:bg-slate-100 p-2 rounded-lg border border-slate-200 flex justify-between items-center cursor-pointer">
+                                    <span class="font-semibold text-slate-800 truncate">{{ t.title }}</span>
+                                    <span :class="getStatusBadgeClass(t.status)" class="text-[10px] px-1.5 py-0.2 rounded font-bold shrink-0">
+                                        {{ t.status }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Call & WhatsApp Action Buttons -->
+                    <div class="pt-4 mt-4 border-t border-slate-100 grid grid-cols-2 gap-2">
+                        <a :href="'tel:' + c.phone" class="bg-sky-50 hover:bg-sky-100 text-sky-700 font-bold text-xs py-2 rounded-xl text-center flex items-center justify-center gap-1.5 border border-sky-200">
+                            <i class="fa-solid fa-phone"></i> Chiama
+                        </a>
+                        <a :href="'https://wa.me/' + cleanPhoneForWa(c.phone)" target="_blank" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs py-2 rounded-xl text-center flex items-center justify-center gap-1.5 border border-emerald-200">
+                            <i class="fa-brands fa-whatsapp text-sm"></i> WhatsApp
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- TAB 5: RIEPILOGO & BUDGET -->
+        <div v-if="currentTab === 'budget'" class="space-y-5">
+            
+            <div class="bg-white rounded-2xl p-5 card-shadow border border-slate-200/80">
+                <h2 class="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
+                    <i class="fa-solid fa-wallet text-emerald-600"></i> Quadro Economico
+                </h2>
+
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <span class="text-[11px] font-bold text-slate-500 uppercase block">Totale Preventivato</span>
+                        <span class="text-xl font-bold text-slate-800">€ {{ formatMoney(totalPreventivo) }}</span>
+                    </div>
+
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <span class="text-[11px] font-bold text-slate-500 uppercase block">Totale Speso Effettivo</span>
+                        <span class="text-xl font-bold text-emerald-700">€ {{ formatMoney(totalSpeso) }}</span>
+                    </div>
+
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <span class="text-[11px] font-bold text-slate-500 uppercase block">Residuo / Margine</span>
+                        <span :class="['text-xl font-bold', (totalPreventivo - totalSpeso) >= 0 ? 'text-sky-700' : 'text-rose-600']">
+                            € {{ formatMoney(totalPreventivo - totalSpeso) }}
+                        </span>
+                    </div>
+
+                    <div class="bg-amber-50/60 p-4 rounded-xl border border-amber-200">
+                        <span class="text-[11px] font-bold text-amber-800 uppercase block">Stima Materiali da Comprare</span>
+                        <span class="text-xl font-bold text-amber-900">€ {{ formatMoney(totalPendingMaterialsCost) }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STATISTICHE AMBIENTE E PRIORITA -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="bg-white rounded-2xl p-5 card-shadow border border-slate-200/80">
+                    <h3 class="font-bold text-slate-800 text-base mb-3">Avanzamento per Ambiente</h3>
+                    <div class="space-y-3">
+                        <div v-for="env in environmentStats" :key="env.name">
+                            <div class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                                <span>{{ env.name }}</span>
+                                <span>{{ env.completed }}/{{ env.total }} ({{ env.percentage }}%)</span>
+                            </div>
+                            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                <div class="bg-sky-600 h-full transition-all duration-300" :style="{ width: env.percentage + '%' }"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl p-5 card-shadow border border-slate-200/80">
+                    <h3 class="font-bold text-slate-800 text-base mb-3">Avanzamento per Priorità</h3>
+                    <div class="space-y-3">
+                        <div v-for="prio in priorityStats" :key="prio.code">
+                            <div class="flex justify-between items-center mb-1">
+                                <span :class="getPriorityBadgeClass(prio.code)" class="text-xs px-2 py-0.5 rounded font-bold">
+                                    {{ prio.code }}
+                                </span>
+                                <span class="text-xs font-semibold text-slate-600">{{ prio.completed }}/{{ prio.total }} ({{ prio.percentage }}%)</span>
+                            </div>
+                            <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                                <div class="bg-indigo-600 h-full transition-all duration-300" :style="{ width: prio.percentage + '%' }"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- MODALE MODIFICA / CREAZIONE LAVORO (CON GEMINI COMPILER) -->
+        <div v-if="activeTask" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 overflow-y-auto">
+            <div class="bg-white rounded-2xl max-w-2xl w-full card-shadow border border-slate-200 overflow-hidden my-6 max-h-[92vh] flex flex-col">
+                
+                <!-- Modal Header -->
+                <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                    <div class="flex items-center gap-2">
+                        <span :class="getPriorityBadgeClass(activeTask.priority)" class="text-xs px-2.5 py-1 rounded font-bold">
+                            {{ activeTask.priority }}
+                        </span>
+                        <h3 class="font-bold text-slate-800 text-base sm:text-lg">Dettaglio & Compilazione Lavoro</h3>
+                    </div>
+                    <button @click="activeTask = null" class="text-slate-400 hover:text-slate-600 p-1"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+
+                <!-- Modal Body -->
+                <div class="p-4 sm:p-6 overflow-y-auto space-y-4 text-xs">
+                    
+                    <!-- PULSANTE MAGICO GEMINI COMPILER -->
+                    <div class="bg-gradient-to-r from-indigo-50 via-sky-50 to-emerald-50 border border-indigo-200 rounded-xl p-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                        <div>
+                            <span class="font-bold text-indigo-900 flex items-center gap-1.5 text-xs">
+                                <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i> Generazione Automatica Gemini
+                            </span>
+                            <p class="text-[11px] text-slate-600">Scrivi il titolo del lavoro e clicca per generare materiali, sotto-lavori e durata!</p>
+                        </div>
+                        <button @click="autocompileWithGemini" :disabled="isGeminiCompiling || !activeTask.title.trim()" 
+                                class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-2 rounded-xl text-xs transition flex items-center gap-1.5 shrink-0 disabled:opacity-50">
+                            <i v-if="isGeminiCompiling" class="fa-solid fa-spinner animate-spin"></i>
+                            <i v-else class="fa-solid fa-bolt"></i>
+                            <span>✨ Compila con Gemini</span>
+                        </button>
+                    </div>
+
+                    <!-- Titolo & Ambiente -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="sm:col-span-2">
+                            <label class="font-bold text-slate-500 uppercase block mb-1">Nome Lavoro</label>
+                            <input type="text" v-model="activeTask.title" placeholder="Es. Posare parquet camera..." class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-bold text-slate-800 text-sm">
+                        </div>
+                        <div>
+                            <label class="font-bold text-slate-500 uppercase block mb-1">Ambiente</label>
+                            <select v-model="activeTask.environment" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-semibold">
+                                <option v-for="env in environmentsList" :key="env" :value="env">{{ env }}</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Priorità, Stato, Chi lo fa, Meteo, Durata -->
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        <div>
+                            <label class="font-bold text-slate-500 uppercase block mb-1">Priorità</label>
+                            <select v-model="activeTask.priority" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-semibold">
+                                <option value="P0">P0 - Urgente</option>
+                                <option value="P1">P1 - Alta</option>
+                                <option value="P2">P2 - Media</option>
+                                <option value="P3">P3 - Bassa</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="font-bold text-slate-500 uppercase block mb-1">Stato</label>
+                            <select v-model="activeTask.status" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-semibold">
+                                <option value="Non iniziata">Non iniziata</option>
+                                <option value="In corso">In corso</option>
+                                <option value="In attesa preventivo">In attesa preventivo</option>
+                                <option value="Completata">Completata</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="font-bold text-slate-500 uppercase block mb-1">Chi lo fa?</label>
+                            <select v-model="activeTask.assignee" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-semibold">
+                                <option value="Fai da te">Fai da te</option>
+                                <option v-for="c in contractors" :key="c.id" :value="c.role">{{ c.role }} ({{ c.name }})</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="font-bold text-slate-400 uppercase block mb-1">Meteo</label>
+                            <select v-model="activeTask.weather" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-semibold">
+                                <option value="Interno">🏠 Interno</option>
+                                <option value="Esterno">☀️ Esterno</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="font-bold text-slate-400 uppercase block mb-1">Durata Stima</label>
+                            <select v-model="activeTask.duration" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 font-semibold">
+                                <option value="30m">30 min</option>
+                                <option value="2h">2 ore</option>
+                                <option value="½ giornata">½ giornata</option>
+                                <option value="1 giorno">1 giorno</option>
+                                <option value="Più giorni">Più giorni</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Dipendenza da altro lavoro -->
+                    <div>
+                        <label class="font-bold text-slate-500 uppercase block mb-1">Dipende dal completamento di:</label>
+                        <select v-model="activeTask.dependsOn" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 font-medium">
+                            <option :value="null">Nessuna dipendenza (Eseguibile liberamente)</option>
+                            <option v-for="t in availableParentTasks" :key="t.id" :value="t.id">
+                                {{ t.title }} ({{ t.environment }}) - {{ t.status }}
+                            </option>
+                        </select>
+                    </div>
+
+                    <!-- SOTTO-LAVORI -->
+                    <div class="border border-slate-200 rounded-xl p-3 bg-slate-50/50">
+                        <label class="font-bold text-slate-600 uppercase block mb-2">Sotto-lavori / Checklist</label>
+                        <div class="flex gap-2 mb-2">
+                            <input type="text" v-model="newSubtaskTitle" @keyup.enter="addSubtask" placeholder="Aggiungi passo..." class="flex-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs">
+                            <button @click="addSubtask" class="bg-slate-800 text-white px-3 py-1.5 rounded-lg font-bold">Add</button>
+                        </div>
+                        <div class="space-y-1 max-h-32 overflow-y-auto">
+                            <div v-for="(st, idx) in activeTask.subtasks" :key="idx" class="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200/60">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" v-model="st.done" class="rounded text-sky-600">
+                                    <span :class="{ 'line-through text-slate-400': st.done }">{{ st.title }}</span>
+                                </label>
+                                <button @click="activeTask.subtasks.splice(idx, 1)" class="text-slate-300 hover:text-rose-500"><i class="fa-solid fa-trash-can"></i></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MATERIALI NECESSARI -->
+                    <div class="border border-slate-200 rounded-xl p-3 bg-slate-50/50 space-y-2">
+                        <div class="flex justify-between items-center">
+                            <label class="font-bold text-slate-600 uppercase">Materiali necessari</label>
+                            <label class="flex items-center gap-1 text-slate-600 cursor-pointer">
+                                <input type="checkbox" v-model="activeTask.noMaterialsNeeded" class="rounded text-emerald-600">
+                                <span>Non servono materiali</span>
+                            </label>
+                        </div>
+
+                        <div v-if="!activeTask.noMaterialsNeeded" class="space-y-2">
+                            <!-- Add material form -->
+                            <div class="grid grid-cols-12 gap-1.5 bg-white p-2 rounded-xl border border-slate-200">
+                                <input type="text" v-model="newMat.name" placeholder="Materiale" class="col-span-4 bg-slate-50 border border-slate-200 rounded-lg p-1.5">
+                                <input type="text" v-model="newMat.quantity" placeholder="Qtà" class="col-span-2 bg-slate-50 border border-slate-200 rounded-lg p-1.5">
+                                <select v-model="newMat.store" class="col-span-3 bg-slate-50 border border-slate-200 rounded-lg p-1.5 font-medium">
+                                    <option v-for="s in storesList.filter(x => x !== 'Tutti')" :key="s" :value="s">{{ s }}</option>
+                                </select>
+                                <select v-model="newMat.status" class="col-span-2 bg-slate-50 border border-slate-200 rounded-lg p-1.5">
+                                    <option value="Da comprare">Da comprare</option>
+                                    <option value="Ordinato">Ordinato</option>
+                                    <option value="In casa">In casa</option>
+                                </select>
+                                <button @click="addMaterialToActiveTask" class="col-span-1 bg-amber-500 text-white rounded-lg font-bold flex items-center justify-center">
+                                    <i class="fa-solid fa-plus"></i>
+                                </button>
+                            </div>
+
+                            <div class="space-y-1">
+                                <div v-for="(mat, idx) in activeTask.materials" :key="idx" class="flex items-center justify-between bg-white p-2 rounded-lg border border-slate-200/60">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="font-bold text-slate-700">{{ mat.name }}</span>
+                                        <span v-if="mat.quantity" class="text-slate-400">({{ mat.quantity }})</span>
+                                        <span class="bg-sky-50 text-sky-700 px-1.5 py-0.2 rounded font-semibold text-[10px]">{{ mat.store }}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <select v-model="mat.status" class="bg-slate-50 border border-slate-200 rounded p-1 text-[10px]">
+                                            <option value="Da comprare">🟡 Da comprare</option>
+                                            <option value="Ordinato">🔴 Ordinato</option>
+                                            <option value="In casa">🟢 In casa</option>
+                                        </select>
+                                        <button @click="activeTask.materials.splice(idx, 1)" class="text-slate-300 hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ATTREZZI NECESSARI -->
+                    <div class="border border-slate-200 rounded-xl p-3 bg-slate-50/50">
+                        <label class="font-bold text-slate-600 uppercase block mb-2">Attrezzi Particolari</label>
+                        <div class="flex gap-2 mb-2">
+                            <input type="text" v-model="newTool.name" placeholder="Es. Tassellatore, Motosega..." class="flex-1 bg-white border border-slate-200 rounded-lg px-2.5 py-1.5">
+                            <select v-model="newTool.status" class="bg-white border border-slate-200 rounded-lg px-2 py-1.5 font-medium">
+                                <option value="Ce l'ho">Ce l'ho</option>
+                                <option value="Da prestare / noleggiare">Da noleggiare/prestare</option>
+                            </select>
+                            <button @click="addToolToActiveTask" class="bg-slate-800 text-white px-3 py-1.5 rounded-lg font-bold">Add</button>
+                        </div>
+                        <div class="flex flex-wrap gap-1.5">
+                            <span v-for="(t, idx) in activeTask.tools" :key="idx" class="bg-white border border-slate-200 px-2 py-1 rounded-lg flex items-center gap-2">
+                                🛠️ {{ t.name }} ({{ t.status }})
+                                <button @click="activeTask.tools.splice(idx, 1)" class="text-slate-300 hover:text-rose-500"><i class="fa-solid fa-xmark"></i></button>
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- PREVENTIVO & COSTI -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="font-bold text-slate-500 uppercase block mb-1">Preventivo (€)</label>
+                            <input type="number" v-model.number="activeTask.costEstimated" placeholder="0" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 font-bold">
+                        </div>
+                        <div>
+                            <label class="font-bold text-slate-500 uppercase block mb-1">Costo Effettivo (€)</label>
+                            <input type="number" v-model.number="activeTask.costActual" placeholder="0" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 font-bold text-emerald-700">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-slate-500 uppercase block mb-1">Note & Prossimo passo</label>
+                        <textarea v-model="activeTask.notes" rows="2" placeholder="Note operative, contatti o dettagli..." class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 text-slate-700"></textarea>
+                    </div>
+
+                </div>
+
+                <!-- Modal Footer -->
+                <div class="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
+                    <button @click="confirmDeleteTask(activeTask)" class="text-rose-600 hover:bg-rose-50 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1">
+                        <i class="fa-solid fa-trash-can"></i> Elimina
+                    </button>
+                    <button @click="saveTaskModal" class="bg-sky-600 hover:bg-sky-700 text-white px-5 py-2 rounded-xl text-xs font-bold shadow transition">
+                        Salva Lavoro
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+
+        <!-- MODALE INSERIMENTO RAPIDO AI (GEMINI) -->
+        <div v-if="showQuickAiModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3">
+            <div class="bg-white rounded-2xl max-w-lg w-full p-5 card-shadow space-y-4">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-extrabold text-slate-800 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-wand-magic-sparkles text-indigo-600"></i> ✨ Inserimento Rapido AI
+                    </h3>
+                    <button @click="showQuickAiModal = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <p class="text-xs text-slate-500">Parla o scrivi liberamente a Gemini! Puoi aggiungere un nuovo lavoro o comprare materiali in un istante.</p>
+
+                <textarea v-model="quickAiPrompt" rows="3" 
+                          placeholder="Es: Ho comprato 2 scatole di tasselli a 15 euro da Ferramenta per le finestre garage..." 
+                          class="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-800 focus:outline-none focus:border-indigo-500 font-medium"></textarea>
+
+                <div class="flex justify-end gap-2">
+                    <button @click="showQuickAiModal = false" class="px-4 py-2 bg-slate-100 rounded-xl text-xs font-bold text-slate-600">Annulla</button>
+                    <button @click="processQuickAiPrompt" :disabled="isQuickAiProcessing || !quickAiPrompt.trim()" 
+                            class="px-5 py-2 bg-gradient-to-r from-indigo-600 to-sky-600 text-white rounded-xl text-xs font-bold shadow flex items-center gap-1.5 disabled:opacity-50">
+                        <i v-if="isQuickAiProcessing" class="fa-solid fa-spinner animate-spin"></i>
+                        <span>Elabora con AI</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- MODALE MODIFICA / CREAZIONE DITTA -->
+        <div v-if="activeContractor" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3">
+            <div class="bg-white rounded-2xl max-w-md w-full p-5 card-shadow space-y-4 text-xs">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-slate-800 text-base">Scheda Ditta / Artigiano</h3>
+                    <button @click="activeContractor = null" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div>
+                    <label class="font-bold text-slate-500 block mb-1">Nome Referente / Impresa</label>
+                    <input type="text" v-model="activeContractor.name" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-bold">
+                </div>
+
+                <div>
+                    <label class="font-bold text-slate-500 block mb-1">Ruolo / Specializzazione</label>
+                    <input type="text" v-model="activeContractor.role" placeholder="Es. Idraulico, Impresa Edile..." class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 font-semibold">
+                </div>
+
+                <div>
+                    <label class="font-bold text-slate-500 block mb-1">Telefono</label>
+                    <input type="text" v-model="activeContractor.phone" placeholder="Es. +39 333 1234567" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5">
+                </div>
+
+                <div>
+                    <label class="font-bold text-slate-500 block mb-1">Note / Accordi</label>
+                    <textarea v-model="activeContractor.notes" rows="2" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5"></textarea>
+                </div>
+
+                <div class="flex justify-between items-center pt-2">
+                    <button @click="deleteContractor(activeContractor.id)" class="text-rose-600 font-bold">Elimina</button>
+                    <button @click="saveContractorModal" class="bg-indigo-600 text-white px-4 py-2 rounded-xl font-bold">Salva Ditta</button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- MODALE AGGIUNTA MATERIALE RAPIDO -->
+        <div v-if="showAddMaterialModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3">
+            <div class="bg-white rounded-2xl max-w-md w-full p-5 card-shadow space-y-3 text-xs">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-slate-800">Aggiungi Materiale</h3>
+                    <button @click="showAddMaterialModal = false" class="text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+
+                <div>
+                    <label class="font-bold text-slate-500 block mb-1">Collega a Lavoro</label>
+                    <select v-model="quickMat.taskId" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 font-medium">
+                        <option v-for="t in tasks" :key="t.id" :value="t.id">{{ t.title }} ({{ t.environment }})</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="font-bold text-slate-500 block mb-1">Nome Materiale</label>
+                    <input type="text" v-model="quickMat.name" placeholder="Es. Tasselli 10mm" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2">
+                </div>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="font-bold text-slate-500 block mb-1">Quantità</label>
+                        <input type="text" v-model="quickMat.quantity" placeholder="Es. 2 scatole" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2">
+                    </div>
+                    <div>
+                        <label class="font-bold text-slate-500 block mb-1">Negozio</label>
+                        <select v-model="quickMat.store" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2 font-medium">
+                            <option v-for="s in storesList.filter(x => x !== 'Tutti')" :key="s" :value="s">{{ s }}</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="font-bold text-slate-500 block mb-1">Misura / Codice / Link</label>
+                    <input type="text" v-model="quickMat.codeUrl" placeholder="Es. 120x80cm oppure URL..." class="w-full bg-slate-50 border border-slate-200 rounded-xl p-2">
+                </div>
+
+                <div class="flex justify-end gap-2 pt-2">
+                    <button @click="showAddMaterialModal = false" class="px-4 py-2 bg-slate-100 rounded-xl font-bold">Annulla</button>
+                    <button @click="saveQuickMaterial" class="px-4 py-2 bg-amber-500 text-white rounded-xl font-bold">Aggiungi</button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- MODALE IMPOSTAZIONI & BACKUP -->
+        <div v-if="showSettingsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3">
+            <div class="bg-white rounded-2xl max-w-md w-full p-5 card-shadow space-y-4 text-xs">
+                <div class="flex justify-between items-center">
+                    <h3 class="font-bold text-slate-800 text-base">Impostazioni & Backup Dati</h3>
+                    <button @click="showSettingsModal = false" class="text-slate-400"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+
+                <!-- Gemini API Key configuration -->
+                <div class="bg-indigo-50 border border-indigo-200 rounded-xl p-3 space-y-1.5">
+                    <label class="font-bold text-indigo-900 block">Chiave API Gemini Personalizzata (Opzionale)</label>
+                    <input type="password" v-model="customApiKey" placeholder="Lascia vuoto per usare il runtime standard..." class="w-full bg-white border border-indigo-200 rounded-lg p-2 font-mono">
+                    <p class="text-[10px] text-slate-500">Se inserita, viene salvata nel tuo browser per abilitare le chiamate Gemini AI.</p>
+                </div>
+
+                <div class="space-y-2 pt-2">
+                    <button @click="exportCSV" class="w-full text-left p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold flex items-center gap-2">
+                        <i class="fa-solid fa-file-csv text-emerald-600 text-base"></i> Esporta Excel / Google Fogli (CSV)
+                    </button>
+                    <button @click="exportJSON" class="w-full text-left p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold flex items-center gap-2">
+                        <i class="fa-solid fa-download text-sky-600 text-base"></i> Scarica Backup JSON
+                    </button>
+                    <label class="w-full text-left p-3 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 font-semibold flex items-center gap-2 cursor-pointer">
+                        <i class="fa-solid fa-upload text-indigo-600 text-base"></i> Ripristina da file JSON
+                        <input type="file" accept=".json" @change="importJSON" class="hidden">
+                    </label>
+                    <hr class="my-2 border-slate-100">
+                    <button @click="resetToDefaultData" class="w-full text-left p-3 rounded-xl bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold flex items-center gap-2">
+                        <i class="fa-solid fa-rotate-left text-base"></i> Ripristina i 34 Lavori Iniziali
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- TOAST NOTIFICATION -->
+        <div v-if="toastMessage" class="fixed bottom-20 md:bottom-6 right-4 z-50 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-xl border border-slate-700 text-xs font-semibold flex items-center gap-2 animate-bounce">
+            <i class="fa-solid fa-circle-check text-emerald-400"></i> {{ toastMessage }}
+        </div>
+
+
+        <!-- MOBILE FOOTER TAB BAR (BARRA FISSA IN BASSO) -->
+        <div class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 px-2 py-1.5 flex justify-around items-center z-40 card-shadow">
+            <button @click="currentTab = 'domani'" :class="['flex flex-col items-center py-1 px-2 text-[10px]', currentTab === 'domani' ? 'mobile-tab-active' : 'text-slate-500']">
+                <i class="fa-solid fa-bolt text-lg mb-0.5"></i>
+                <span>Domani</span>
+            </button>
+            <button @click="currentTab = 'tutti'" :class="['flex flex-col items-center py-1 px-2 text-[10px]', currentTab === 'tutti' ? 'mobile-tab-active' : 'text-slate-500']">
+                <i class="fa-solid fa-list-check text-lg mb-0.5"></i>
+                <span>Lavori</span>
+            </button>
+            <button @click="currentTab = 'spesa'" :class="['flex flex-col items-center py-1 px-2 text-[10px]', currentTab === 'spesa' ? 'mobile-tab-active' : 'text-slate-500']">
+                <i class="fa-solid fa-cart-shopping text-lg mb-0.5"></i>
+                <span>Spesa</span>
+            </button>
+            <button @click="currentTab = 'ditte'" :class="['flex flex-col items-center py-1 px-2 text-[10px]', currentTab === 'ditte' ? 'mobile-tab-active' : 'text-slate-500']">
+                <i class="fa-solid fa-user-gear text-lg mb-0.5"></i>
+                <span>Ditte</span>
+            </button>
+            <button @click="currentTab = 'budget'" :class="['flex flex-col items-center py-1 px-2 text-[10px]', currentTab === 'budget' ? 'mobile-tab-active' : 'text-slate-500']">
+                <i class="fa-solid fa-chart-pie text-lg mb-0.5"></i>
+                <span>Budget</span>
+            </button>
+        </div>
+
+    </div>
+
+
+    <script>
+        const { createApp } = Vue;
+
+        // 34 Lavori iniziali reali con dati estesi
+        const INITIAL_TASKS = [
+            { id: 1, title: "Rimuovere battiscopa", environment: "Interni / Muratura", priority: "P0", status: "In corso", assignee: "Fai da te", weather: "Interno", duration: "2h", dependsOn: null, costEstimated: 0, costActual: 0, notes: "Rimuovere con delicatezza nel corridoio e sala con piede di porco", noMaterialsNeeded: true, materials: [], tools: [{ name: "Piede di porco / scalpello", status: "Ce l'ho" }], subtasks: [{ title: "Sala", done: true }, { title: "Corridoio", done: false }] },
+            { id: 2, title: "Demolizione Bagno", environment: "Bagno", priority: "P0", status: "Completata", assignee: "Impresa Edile", weather: "Interno", duration: "1 giorno", dependsOn: null, costEstimated: 1200, costActual: 1200, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 3, title: "Rifacimento Bagno", environment: "Bagno", priority: "P1", status: "In corso", assignee: "Impresa Edile", weather: "Interno", duration: "Più giorni", dependsOn: 2, costEstimated: 4500, costActual: 2000, notes: "Verificare pendenze scarico", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [{ title: "Scarichi e tubi", done: true }, { title: "Massetto", done: true }, { title: "Piastrellatura", done: false }] },
+            { id: 4, title: "Impianto di riscaldamento", environment: "Impianti", priority: "P1", status: "Non iniziata", assignee: "Idraulico", weather: "Interno", duration: "Più giorni", dependsOn: null, costEstimated: 3500, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 5, title: "Impianto fotovoltaico", environment: "Impianti", priority: "P1", status: "Non iniziata", assignee: "Elettricista", weather: "Esterno", duration: "Più giorni", dependsOn: null, costEstimated: 6000, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 6, title: "Portafinestra", environment: "Interni / Muratura", priority: "P1", status: "In attesa preventivo", assignee: "Serramentista", weather: "Interno", duration: "1 giorno", dependsOn: null, costEstimated: 1100, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 7, title: "Mettere finestre garage", environment: "Garage", priority: "P1", status: "Non iniziata", assignee: "Fai da te", weather: "Interno", duration: "½ giornata", dependsOn: null, costEstimated: 150, costActual: 0, notes: "Pulire bene le spalline prima del fissaggio", noMaterialsNeeded: false, materials: [{ name: "Schiuma poliuretanica", quantity: "2 bombole", store: "Tecnomat / Leroy Merlin", cost: 14, status: "Da comprare", codeUrl: "" }, { name: "Tasselli 10mm", quantity: "1 scatola", store: "Ferramenta", cost: 8, status: "In casa", codeUrl: "Tasselli Fischer SX" }, { name: "Silicone neutro", quantity: "2 tubi", store: "Tecnomat / Leroy Merlin", cost: 10, status: "Da comprare", codeUrl: "" }], tools: [{ name: "Tassellatore", status: "Ce l'ho" }, { name: "Livella laser", status: "Ce l'ho" }], subtasks: [{ title: "Pulire vano", done: false }, { title: "Posizionare telaio a bolla", done: false }, { title: "Fissare e schiumare", done: false }] },
+            { id: 8, title: "Mettere porta garage", environment: "Garage", priority: "P1", status: "Non iniziata", assignee: "Impresa Edile", weather: "Interno", duration: "1 giorno", dependsOn: null, costEstimated: 800, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 9, title: "Cucina", environment: "Cucina", priority: "P1", status: "Non iniziata", assignee: "Impresa Edile", weather: "Interno", duration: "Più giorni", dependsOn: 16, costEstimated: 5000, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 10, title: "Mobili", environment: "Interni / Muratura", priority: "P1", status: "Non iniziata", assignee: "Fai da te", weather: "Interno", duration: "½ giornata", dependsOn: null, costEstimated: 200, costActual: 0, notes: "", noMaterialsNeeded: false, materials: [{ name: "Viti e staffe fissaggio muro", quantity: "1 kit", store: "Ferramenta", cost: 15, status: "Da comprare", codeUrl: "" }], tools: [], subtasks: [] },
+            { id: 11, title: "Camera", environment: "Camera", priority: "P1", status: "Non iniziata", assignee: "Fai da te", weather: "Interno", duration: "1 giorno", dependsOn: null, costEstimated: 120, costActual: 0, notes: "Carteggiare bene gli angoli prima di pittura", noMaterialsNeeded: false, materials: [{ name: "Pittura lavabile bianca 14L", quantity: "1 latta", store: "Tecnomat / Leroy Merlin", cost: 55, status: "Da comprare", codeUrl: "" }], tools: [], subtasks: [{ title: "Stuccare fori", done: false }, { title: "Carteggiare", done: false }, { title: "Prima mano", done: false }] },
+            { id: 12, title: "Spostare tubazioni impianti", environment: "Impianti", priority: "P1", status: "Completata", assignee: "Idraulico", weather: "Interno", duration: "1 giorno", dependsOn: null, costEstimated: 450, costActual: 450, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 13, title: "Fossa biologica", environment: "Impianti", priority: "P1", status: "Non iniziata", assignee: "Impresa Edile", weather: "Esterno", duration: "Più giorni", dependsOn: null, costEstimated: 2500, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 14, title: "Togliere eternit", environment: "Tetto / Esterno", priority: "P1", status: "In attesa preventivo", assignee: "Impresa Edile", weather: "Esterno", duration: "1 giorno", dependsOn: null, costEstimated: 1800, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 15, title: "Aprire muro garage", environment: "Garage", priority: "P1", status: "Non iniziata", assignee: "Impresa Edile", weather: "Interno", duration: "1 giorno", dependsOn: null, costEstimated: 900, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 16, title: "Demolizione Cucina", environment: "Cucina", priority: "P1", status: "Completata", assignee: "Impresa Edile", weather: "Interno", duration: "1 giorno", dependsOn: null, costEstimated: 600, costActual: 600, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 17, title: "Autolivellante su Pavimento", environment: "Interni / Muratura", priority: "P1", status: "Non iniziata", assignee: "Impresa Edile", weather: "Interno", duration: "1 giorno", dependsOn: 4, costEstimated: 1400, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 18, title: "Infissi", environment: "Interni / Muratura", priority: "P2", status: "In attesa preventivo", assignee: "Serramentista", weather: "Interno", duration: "Più giorni", dependsOn: null, costEstimated: 4000, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 19, title: "Aggiustare Grondaie", environment: "Tetto / Esterno", priority: "P2", status: "Non iniziata", assignee: "Impresa Edile", weather: "Esterno", duration: "½ giornata", dependsOn: null, costEstimated: 350, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 20, title: "Rimuovere intonaco esterno", environment: "Tetto / Esterno", priority: "P2", status: "Non iniziata", assignee: "Impresa Edile", weather: "Esterno", duration: "Più giorni", dependsOn: null, costEstimated: 2000, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 21, title: "Rimuovere intonaco interno", environment: "Interni / Muratura", priority: "P2", status: "Non iniziata", assignee: "Impresa Edile", weather: "Interno", duration: "Più giorni", dependsOn: null, costEstimated: 1500, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 22, title: "Sostituire trave cantina piano inferiore", environment: "Interni / Muratura", priority: "P2", status: "Non iniziata", assignee: "Impresa Edile", weather: "Interno", duration: "1 giorno", dependsOn: null, costEstimated: 800, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 23, title: "Rimozione piante infestanti", environment: "Giardino", priority: "P2", status: "Non iniziata", assignee: "Fai da te", weather: "Esterno", duration: "2h", dependsOn: null, costEstimated: 0, costActual: 0, notes: "Pulizia retro casa", noMaterialsNeeded: false, materials: [{ name: "Sacchi resistenti giardino", quantity: "1 confezione", store: "Vivaio", cost: 6, status: "In casa", codeUrl: "" }], tools: [], subtasks: [] },
+            { id: 24, title: "Muro esterno giardino superiore", environment: "Giardino", priority: "P2", status: "Non iniziata", assignee: "Impresa Edile", weather: "Esterno", duration: "Più giorni", dependsOn: null, costEstimated: 2200, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 25, title: "Illuminazione esterna", environment: "Giardino", priority: "P2", status: "Non iniziata", assignee: "Elettricista", weather: "Esterno", duration: "1 giorno", dependsOn: null, costEstimated: 950, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 26, title: "Pavimentazione esterna", environment: "Tetto / Esterno", priority: "P2", status: "Non iniziata", assignee: "Impresa Edile", weather: "Esterno", duration: "Più giorni", dependsOn: null, costEstimated: 3000, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 27, title: "Scolo acqua vialetto", environment: "Giardino", priority: "P2", status: "Non iniziata", assignee: "Impresa Edile", weather: "Esterno", duration: "1 giorno", dependsOn: null, costEstimated: 700, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 28, title: "Ventilazioni sottotetto", environment: "Tetto / Esterno", priority: "P2", status: "Non iniziata", assignee: "Impresa Edile", weather: "Esterno", duration: "½ giornata", dependsOn: null, costEstimated: 450, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] },
+            { id: 29, title: "Fare portone garage", environment: "Garage", priority: "P3", status: "Non iniziata", assignee: "Fai da te", weather: "Interno", duration: "1 giorno", dependsOn: 15, costEstimated: 300, costActual: 0, notes: "", noMaterialsNeeded: false, materials: [{ name: "Cerniere pesanti", quantity: "4 pz", store: "Ferramenta", cost: 24, status: "Da comprare", codeUrl: "" }, { name: "Tavole legno abete", quantity: "10 tavole", store: "Magazzino Edile", cost: 180, status: "Ordinato", codeUrl: "" }], tools: [], subtasks: [] },
+            { id: 30, title: "Togliere blocchi cemento giardino di fronte", environment: "Giardino", priority: "P3", status: "Non iniziata", assignee: "Fai da te", weather: "Esterno", duration: "2h", dependsOn: null, costEstimated: 0, costActual: 0, notes: "Spostare con carriola", noMaterialsNeeded: true, materials: [], tools: [{ name: "Carriola e guanti", status: "Ce l'ho" }], subtasks: [] },
+            { id: 31, title: "Capanno", environment: "Giardino", priority: "P3", status: "Non iniziata", assignee: "Fai da te", weather: "Esterno", duration: "Più giorni", dependsOn: null, costEstimated: 180, costActual: 0, notes: "", noMaterialsNeeded: false, materials: [{ name: "Guaina bituminosa tetto", quantity: "1 rotolo", store: "Magazzino Edile", cost: 35, status: "Da comprare", codeUrl: "" }], tools: [], subtasks: [] },
+            { id: 32, title: "Potare abete", environment: "Giardino", priority: "P3", status: "Non iniziata", assignee: "Fai da te", weather: "Esterno", duration: "2h", dependsOn: null, costEstimated: 0, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [{ name: "Motosega / Svettatoio", status: "Da prestare / noleggiare" }], subtasks: [] },
+            { id: 33, title: "Cassetta delle lettere", environment: "Giardino", priority: "P3", status: "Non iniziata", assignee: "Fai da te", weather: "Esterno", duration: "30m", dependsOn: null, costEstimated: 40, costActual: 0, notes: "", noMaterialsNeeded: false, materials: [{ name: "Cassetta postale inox", quantity: "1 pz", store: "Amazon / Online", cost: 29, status: "Da comprare", codeUrl: "https://amazon.it" }, { name: "Tasselli muro 6mm", quantity: "4 pz", store: "Ferramenta", cost: 2, status: "In casa", codeUrl: "" }], tools: [], subtasks: [] },
+            { id: 34, title: "Pulire vialetto garage", environment: "Garage", priority: "P3", status: "Non iniziata", assignee: "Fai da te", weather: "Esterno", duration: "30m", dependsOn: null, costEstimated: 0, costActual: 0, notes: "", noMaterialsNeeded: true, materials: [], tools: [], subtasks: [] }
+        ];
+
+        const INITIAL_CONTRACTORS = [
+            { id: 1, name: "Edilizia Generale Rossi", role: "Impresa Edile", phone: "+39 335 1234567", notes: "Muratura, demolizioni e massetto" },
+            { id: 2, name: "Idraulica Bianchi Srl", role: "Idraulico", phone: "+39 347 9876543", notes: "Impianto riscaldamento e bagni" },
+            { id: 3, name: "ElettroVerde Soluzioni", role: "Elettricista", phone: "+39 328 5554433", notes: "Fotovoltaico ed impianto elettrico" },
+            { id: 4, name: "EuroInfissi Design", role: "Serramentista", phone: "+39 340 1122334", notes: "Finestre, portafinestra e portone" }
+        ];
+
+        createApp({
+            data() {
+                return {
+                    currentTab: 'domani',
+                    tasks: [],
+                    contractors: [],
+                    customApiKey: '',
+                    toastMessage: null,
+
+                    // Filters Domani Tab
+                    domaniWeatherFilter: 'Tutti',
+                    domaniDurationFilter: 'Tutte',
+                    aiConsiglierePrompt: '',
+                    isGeminiThinking: false,
+                    geminiAdviceResult: null,
+
+                    // Filters Tutti Lavori Tab
+                    searchQuery: '',
+                    filterAssigneeGroup: 'Tutti',
+                    filterStatus: 'Tutti',
+                    filterPriority: 'Tutti',
+                    filterEnvironment: 'Tutti',
+                    filterWeather: 'Tutti',
+                    filterMaterialStatus: 'Tutti',
+
+                    // Filters Lista Spesa Tab
+                    spesaFilterStore: 'Tutti',
+                    spesaFilterStatus: 'Da comprare',
+
+                    // Active Modal States
+                    activeTask: null,
+                    isGeminiCompiling: false,
+                    newSubtaskTitle: '',
+                    newMat: { name: '', quantity: '', store: 'Tecnomat / Leroy Merlin', status: 'Da comprare' },
+                    newTool: { name: '', status: "Ce l'ho" },
+
+                    // Quick AI Modal
+                    showQuickAiModal: false,
+                    quickAiPrompt: '',
+                    isQuickAiProcessing: false,
+
+                    // Contractor Modal
+                    activeContractor: null,
+
+                    // Quick Material Modal
+                    showAddMaterialModal: false,
+                    quickMat: { taskId: null, name: '', quantity: '', store: 'Tecnomat / Leroy Merlin', codeUrl: '' },
+
+                    // Settings Modal
+                    showSettingsModal: false,
+
+                    environmentsList: [
+                        'Bagno', 'Camera', 'Cucina', 'Garage', 'Giardino', 'Impianti', 'Interni / Muratura', 'Tetto / Esterno'
+                    ],
+                    storesList: [
+                        'Tutti', 'Tecnomat / Leroy Merlin', 'Ferramenta', 'Magazzino Edile', 'Vivaio', 'Amazon / Online', 'Altro'
+                    ]
+                }
+            },
+            mounted() {
+                const savedTasks = localStorage.getItem('cantiere_casa_v2_tasks');
+                if (savedTasks) {
+                    try { this.tasks = JSON.parse(savedTasks); } catch (e) { this.tasks = INITIAL_TASKS; }
+                } else {
+                    this.tasks = INITIAL_TASKS;
+                    this.saveTasks();
+                }
+
+                const savedContractors = localStorage.getItem('cantiere_casa_v2_contractors');
+                if (savedContractors) {
+                    try { this.contractors = JSON.parse(savedContractors); } catch (e) { this.contractors = INITIAL_CONTRACTORS; }
+                } else {
+                    this.contractors = INITIAL_CONTRACTORS;
+                    this.saveContractors();
+                }
+
+                this.customApiKey = localStorage.getItem('cantiere_casa_v2_apikey') || '';
+            },
+            watch: {
+                customApiKey(val) {
+                    localStorage.setItem('cantiere_casa_v2_apikey', val);
+                }
+            },
+            computed: {
+                readyTasksCount() { return this.readyTasksForTomorrow.length; },
+                missingMaterialsCount() {
+                    let count = 0;
+                    this.tasks.forEach(t => {
+                        if (t.status !== 'Completata' && t.materials) {
+                            t.materials.forEach(m => { if (m.status === 'Da comprare') count++; });
+                        }
+                    });
+                    return count;
+                },
+
+                // Ready tasks for Domani Tab (Fai da te, not completed, not blocked by parent task, materials ready)
+                readyTasksForTomorrow() {
+                    return this.tasks.filter(t => {
+                        if (t.status === 'Completata') return false;
+                        if (t.assignee !== 'Fai da te') return false;
+                        
+                        // Check dependency
+                        if (t.dependsOn) {
+                            const parent = this.tasks.find(p => p.id === t.dependsOn);
+                            if (parent && parent.status !== 'Completata') return false;
+                        }
+
+                        // Check materials
+                        if (t.noMaterialsNeeded) return true;
+                        if (!t.materials || t.materials.length === 0) return true;
+                        return t.materials.every(m => m.status === 'In casa');
+                    }).sort((a, b) => {
+                        const prioOrder = { 'P0': 0, 'P1': 1, 'P2': 2, 'P3': 3 };
+                        return prioOrder[a.priority] - prioOrder[b.priority];
+                    });
+                },
+
+                readyTasksFiltered() {
+                    return this.readyTasksForTomorrow.filter(t => {
+                        if (this.domaniWeatherFilter !== 'Tutti' && t.weather !== this.domaniWeatherFilter) return false;
+                        if (this.domaniDurationFilter !== 'Tutte') {
+                            if (this.domaniDurationFilter === '30m' && t.duration !== '30m') return false;
+                            if (this.domaniDurationFilter === '2h' && (t.duration !== '30m' && t.duration !== '2h')) return false;
+                            if (this.domaniDurationFilter === '½ giornata' && (t.duration === '1 giorno' || t.duration === 'Più giorni')) return false;
+                        }
+                        return true;
+                    });
+                },
+
+                blockedTasks() {
+                    return this.tasks.filter(t => {
+                        if (t.status === 'Completata' || t.assignee !== 'Fai da te') return false;
+                        if (t.noMaterialsNeeded || !t.materials || t.materials.length === 0) return false;
+                        return t.materials.some(m => m.status === 'Da comprare' || m.status === 'Ordinato');
+                    });
+                },
+
+                dependencyBlockedTasks() {
+                    return this.tasks.filter(t => {
+                        if (t.status === 'Completata') return false;
+                        if (!t.dependsOn) return false;
+                        const parent = this.tasks.find(p => p.id === t.dependsOn);
+                        return parent && parent.status !== 'Completata';
+                    });
+                },
+
+                ditteTasksActive() {
+                    return this.tasks.filter(t => t.assignee !== 'Fai da te' && t.status !== 'Completata');
+                },
+
+                filteredTasks() {
+                    return this.tasks.filter(t => {
+                        if (this.searchQuery.trim() !== '') {
+                            const q = this.searchQuery.toLowerCase();
+                            const matchTitle = t.title.toLowerCase().includes(q);
+                            const matchEnv = t.environment.toLowerCase().includes(q);
+                            const matchMat = t.materials && t.materials.some(m => m.name.toLowerCase().includes(q));
+                            if (!matchTitle && !matchEnv && !matchMat) return false;
+                        }
+                        if (this.filterAssigneeGroup === 'Fai da te' && t.assignee !== 'Fai da te') return false;
+                        if (this.filterAssigneeGroup === 'Ditte / Artigiani' && t.assignee === 'Fai da te') return false;
+
+                        if (this.filterStatus === 'Aperti' && t.status === 'Completata') return false;
+                        if (this.filterStatus !== 'Tutti' && this.filterStatus !== 'Aperti' && t.status !== this.filterStatus) return false;
+
+                        if (this.filterPriority !== 'Tutti' && t.priority !== this.filterPriority) return false;
+                        if (this.filterEnvironment !== 'Tutti' && t.environment !== this.filterEnvironment) return false;
+                        if (this.filterWeather !== 'Tutti' && t.weather !== this.filterWeather) return false;
+
+                        if (this.filterMaterialStatus !== 'Tutti') {
+                            const text = this.getMaterialStatusText(t);
+                            if (this.filterMaterialStatus === 'Pronti in casa' && text !== 'Pronti in casa') return false;
+                            if (this.filterMaterialStatus === 'Da comprare' && text !== 'Da comprare') return false;
+                            if (this.filterMaterialStatus === 'Non servono' && text !== 'Non servono') return false;
+                        }
+
+                        return true;
+                    });
+                },
+
+                hasActiveFilters() {
+                    return this.searchQuery !== '' || this.filterAssigneeGroup !== 'Tutti' || 
+                           this.filterStatus !== 'Tutti' || this.filterPriority !== 'Tutti' || 
+                           this.filterEnvironment !== 'Tutti' || this.filterWeather !== 'Tutti' || 
+                           this.filterMaterialStatus !== 'Tutti';
+                },
+
+                allMaterialsFiltered() {
+                    const list = [];
+                    this.tasks.forEach(task => {
+                        if (task.materials && task.materials.length > 0) {
+                            task.materials.forEach(mat => {
+                                const matchStore = (this.spesaFilterStore === 'Tutti' || mat.store === this.spesaFilterStore);
+                                const matchStatus = (this.spesaFilterStatus === 'Tutti' || mat.status === this.spesaFilterStatus);
+                                if (matchStore && matchStatus) {
+                                    list.push({ task, material: mat });
+                                }
+                            });
+                        }
+                    });
+                    return list;
+                },
+
+                totalStoreEstimate() {
+                    return this.allMaterialsFiltered.reduce((sum, item) => sum + (item.material.cost || 0), 0);
+                },
+
+                availableParentTasks() {
+                    if (!this.activeTask) return [];
+                    return this.tasks.filter(t => t.id !== this.activeTask.id);
+                },
+
+                totalPreventivo() {
+                    return this.tasks.reduce((sum, t) => sum + (t.costEstimated || 0), 0);
+                },
+                totalSpeso() {
+                    return this.tasks.reduce((sum, t) => sum + (t.costActual || 0), 0);
+                },
+                totalPendingMaterialsCost() {
+                    let total = 0;
+                    this.tasks.forEach(t => {
+                        if (t.materials) {
+                            t.materials.forEach(m => {
+                                if (m.status === 'Da comprare') total += (m.cost || 0);
+                            });
+                        }
+                    });
+                    return total;
+                },
+                environmentStats() {
+                    return this.environmentsList.map(env => {
+                        const envTasks = this.tasks.filter(t => t.environment === env);
+                        const total = envTasks.length;
+                        const completed = envTasks.filter(t => t.status === 'Completata').length;
+                        const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+                        return { name: env, total, completed, percentage };
+                    });
+                },
+                priorityStats() {
+                    return ['P0', 'P1', 'P2', 'P3'].map(p => {
+                        const pTasks = this.tasks.filter(t => t.priority === p);
+                        const total = pTasks.length;
+                        const completed = pTasks.filter(t => t.status === 'Completata').length;
+                        const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+                        return { code: p, total, completed, percentage };
+                    });
+                }
+            },
+            methods: {
+                saveTasks() {
+                    localStorage.setItem('cantiere_casa_v2_tasks', JSON.stringify(this.tasks));
+                },
+                saveContractors() {
+                    localStorage.setItem('cantiere_casa_v2_contractors', JSON.stringify(this.contractors));
+                },
+                showToast(msg) {
+                    this.toastMessage = msg;
+                    setTimeout(() => { this.toastMessage = null; }, 3000);
+                },
+
+                getPriorityBadgeClass(prio) {
+                    switch (prio) {
+                        case 'P0': return 'bg-rose-100 text-rose-800 border border-rose-300';
+                        case 'P1': return 'bg-amber-100 text-amber-900 border border-amber-300';
+                        case 'P2': return 'bg-sky-100 text-sky-800 border border-sky-300';
+                        case 'P3': return 'bg-slate-200 text-slate-700 border border-slate-300';
+                        default: return 'bg-slate-100 text-slate-600';
+                    }
+                },
+                getStatusBadgeClass(status) {
+                    switch (status) {
+                        case 'Completata': return 'bg-emerald-100 text-emerald-800';
+                        case 'In corso': return 'bg-sky-100 text-sky-800';
+                        case 'In attesa preventivo': return 'bg-indigo-100 text-indigo-800';
+                        default: return 'bg-slate-100 text-slate-600';
+                    }
+                },
+                getMaterialStatusText(task) {
+                    if (task.noMaterialsNeeded || !task.materials || task.materials.length === 0) return 'Non servono';
+                    if (task.materials.some(m => m.status === 'Da comprare')) return 'Da comprare';
+                    if (task.materials.some(m => m.status === 'Ordinato')) return 'In attesa';
+                    return 'Pronti in casa';
+                },
+                getMaterialBadgeClass(task) {
+                    const text = this.getMaterialStatusText(task);
+                    if (text === 'Pronti in casa') return 'bg-emerald-100 text-emerald-800';
+                    if (text === 'Da comprare') return 'bg-amber-100 text-amber-800';
+                    if (text === 'In attesa') return 'bg-rose-100 text-rose-800';
+                    return 'bg-slate-100 text-slate-600';
+                },
+                getMaterialStatusSelectClass(status) {
+                    if (status === 'In casa') return 'bg-emerald-50 text-emerald-800';
+                    if (status === 'Da comprare') return 'bg-amber-50 text-amber-800';
+                    return 'bg-rose-50 text-rose-800';
+                },
+                getParentTaskTitle(parentId) {
+                    const p = this.tasks.find(t => t.id === parentId);
+                    return p ? p.title : 'Lavoro sconosciuto';
+                },
+                getMaterialCountByStore(store) {
+                    let count = 0;
+                    this.tasks.forEach(t => {
+                        if (t.materials) {
+                            t.materials.forEach(m => {
+                                if (store === 'Tutti' || m.store === store) count++;
+                            });
+                        }
+                    });
+                    return count;
+                },
+
+                updateTaskStatus(task, newStatus) {
+                    task.status = newStatus;
+                    this.saveTasks();
+                    this.showToast(`Stato aggiornato a: ${newStatus}`);
+                },
+
+                toggleMaterialInHouse(task, material) {
+                    material.status = 'In casa';
+                    this.saveTasks();
+                    this.showToast(`Materiale "${material.name}" segnato come In casa!`);
+                },
+
+                getMissingMaterials(task) {
+                    if (!task.materials) return [];
+                    return task.materials.filter(m => m.status === 'Da comprare' || m.status === 'Ordinato');
+                },
+
+                getSubtasksProgress(task) {
+                    if (!task.subtasks || task.subtasks.length === 0) return 0;
+                    const done = task.subtasks.filter(s => s.done).length;
+                    return Math.round((done / task.subtasks.length) * 100);
+                },
+
+                getCompletedSubtasksCount(task) {
+                    if (!task.subtasks) return 0;
+                    return task.subtasks.filter(s => s.done).length;
+                },
+
+                openTaskModal(task) {
+                    this.activeTask = JSON.parse(JSON.stringify(task));
+                    if (!this.activeTask.tools) this.activeTask.tools = [];
+                },
+
+                openNewTaskModal() {
+                    this.activeTask = {
+                        id: Date.now(),
+                        title: '',
+                        environment: 'Interni / Muratura',
+                        priority: 'P1',
+                        status: 'Non iniziata',
+                        assignee: 'Fai da te',
+                        weather: 'Interno',
+                        duration: '1h',
+                        dependsOn: null,
+                        costEstimated: 0,
+                        costActual: 0,
+                        notes: '',
+                        noMaterialsNeeded: true,
+                        materials: [],
+                        tools: [],
+                        subtasks: []
+                    };
+                },
+
+                saveTaskModal() {
+                    if (!this.activeTask.title.trim()) return;
+                    const index = this.tasks.findIndex(t => t.id === this.activeTask.id);
+                    if (index >= 0) {
+                        this.tasks[index] = this.activeTask;
+                    } else {
+                        this.tasks.push(this.activeTask);
+                    }
+                    this.saveTasks();
+                    this.activeTask = null;
+                    this.showToast("Lavoro salvato con successo!");
+                },
+
+                confirmDeleteTask(task) {
+                    if (confirm(`Eliminare definitivamente "${task.title}"?`)) {
+                        this.tasks = this.tasks.filter(t => t.id !== task.id);
+                        this.saveTasks();
+                        this.activeTask = null;
+                        this.showToast("Lavoro eliminato.");
+                    }
+                },
+
+                addSubtask() {
+                    if (!this.newSubtaskTitle.trim()) return;
+                    if (!this.activeTask.subtasks) this.activeTask.subtasks = [];
+                    this.activeTask.subtasks.push({ title: this.newSubtaskTitle.trim(), done: false });
+                    this.newSubtaskTitle = '';
+                },
+
+                addMaterialToActiveTask() {
+                    if (!this.newMat.name.trim()) return;
+                    if (!this.activeTask.materials) this.activeTask.materials = [];
+                    this.activeTask.materials.push({ ...this.newMat });
+                    this.newMat = { name: '', quantity: '', store: 'Tecnomat / Leroy Merlin', status: 'Da comprare' };
+                    this.activeTask.noMaterialsNeeded = false;
+                },
+
+                addToolToActiveTask() {
+                    if (!this.newTool.name.trim()) return;
+                    if (!this.activeTask.tools) this.activeTask.tools = [];
+                    this.activeTask.tools.push({ ...this.newTool });
+                    this.newTool = { name: '', status: "Ce l'ho" };
+                },
+
+                // GEMINI API CALL helper
+                async callGeminiApi(prompt, systemInstruction = "") {
+                    const apiKey = this.customApiKey.trim() || "";
+                    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`;
+                    
+                    const payload = {
+                        contents: [{ parts: [{ text: prompt }] }],
+                        systemInstruction: systemInstruction ? { parts: [{ text: systemInstruction }] } : undefined
+                    };
+
+                    let delay = 1000;
+                    for (let attempt = 0; attempt < 3; attempt++) {
+                        try {
+                            const res = await fetch(apiUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify(payload)
+                            });
+                            if (res.ok) {
+                                const data = await res.json();
+                                return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+                            }
+                        } catch (err) {
+                            // backoff retry
+                        }
+                        await new Promise(r => setTimeout(r, delay));
+                        delay *= 2;
+                    }
+                    return null;
+                },
+
+                // GEMINI COMPILER (MODALE LAVORO)
+                async autocompileWithGemini() {
+                    if (!this.activeTask || !this.activeTask.title.trim()) return;
+                    this.isGeminiCompiling = true;
+
+                    const systemPrompt = "Sei un maestro di cantiere ed esperto di ristrutturazioni. Restituisci ESCLUSIVAMENTE un oggetto JSON valido con i campi: subtasks (array di stringhe con i passi in ordine logico), materials (array di oggetti {name, quantity, store (scegli tra Tecnomat / Leroy Merlin, Ferramenta, Magazzino Edile, Vivaio, Amazon / Online), cost (numero stima euro), status: 'Da comprare'}), tools (array di oggetti {name, status: 'Ce l\\'ho' oppure 'Da prestare / noleggiare'}), weather ('Interno' oppure 'Esterno'), duration ('30m', '2h', '½ giornata', '1 giorno', 'Più giorni'), notes (breve consiglio pratico).";
+                    const userQuery = `Fornisci dettagli completi per il seguente lavoro di ristrutturazione casa: "${this.activeTask.title}" nell'ambiente "${this.activeTask.environment}".`;
+
+                    const resultText = await this.callGeminiApi(userQuery, systemPrompt);
+                    this.isGeminiCompiling = false;
+
+                    if (resultText) {
+                        try {
+                            const cleanJson = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
+                            const parsed = JSON.parse(cleanJson);
+                            
+                            if (parsed.subtasks) {
+                                this.activeTask.subtasks = parsed.subtasks.map(s => ({ title: s, done: false }));
+                            }
+                            if (parsed.materials && parsed.materials.length > 0) {
+                                this.activeTask.materials = parsed.materials;
+                                this.activeTask.noMaterialsNeeded = false;
+                            }
+                            if (parsed.tools) {
+                                this.activeTask.tools = parsed.tools;
+                            }
+                            if (parsed.weather) this.activeTask.weather = parsed.weather;
+                            if (parsed.duration) this.activeTask.duration = parsed.duration;
+                            if (parsed.notes) this.activeTask.notes = (this.activeTask.notes ? this.activeTask.notes + " | " : "") + parsed.notes;
+
+                            this.showToast("✨ Lavoro compilato automaticamente con Gemini!");
+                        } catch (e) {
+                            this.showToast("Impossibile interpretare la risposta AI.");
+                        }
+                    } else {
+                        this.showToast("Errore di connessione a Gemini.");
+                    }
+                },
+
+                // GEMINI CONSIGLIERE (TAB DOMANI)
+                async askGeminiAdvice() {
+                    if (!this.aiConsiglierePrompt.trim()) return;
+                    this.isGeminiThinking = true;
+
+                    const readyTasksSummary = this.readyTasksForTomorrow.map(t => `- ${t.title} (${t.environment}, priorità ${t.priority}, meteo ${t.weather}, durata ${t.duration || '1h'})`).join('\n');
+                    const blockedSummary = this.blockedTasks.map(t => `- ${t.title} (In attesa materiali)`).join('\n');
+
+                    const systemPrompt = "Sei il tutor operativo per la ristrutturazione casa dell'utente. Rispondi in modo conciso, motivante e strutturato in 3 punti numerati con un piano d'azione pratico per la giornata.";
+                    const userQuery = `Richiesta utente: "${this.aiConsiglierePrompt}".\n\nElenco lavori Fai-da-te sbloccati e pronti in casa:\n${readyTasksSummary || 'Nessuno'}\n\nLavori bloccati da materiali:\n${blockedSummary || 'Nessuno'}`;
+
+                    const reply = await this.callGeminiApi(userQuery, systemPrompt);
+                    this.isGeminiThinking = false;
+                    if (reply) {
+                        this.geminiAdviceResult = reply;
+                    } else {
+                        this.showToast("Errore durante la consultazione dell'AI.");
+                    }
+                },
+
+                // GEMINI QUICK AI ENTRY
+                async processQuickAiPrompt() {
+                    if (!this.quickAiPrompt.trim()) return;
+                    this.isQuickAiProcessing = true;
+
+                    const systemPrompt = "Sei l'assistente AI di Cantiere Casa. Interpreta la frase dell'utente e rispondi con un JSON che contiene un'azione: 'add_task' oppure 'add_material'. Se 'add_task', includi il lavoro {title, environment, priority, assignee, weather, duration}. Se 'add_material', includi {taskTitle (o null se generico), name, quantity, store, cost, status}.";
+                    const resultText = await this.callGeminiApi(this.quickAiPrompt, systemPrompt);
+                    this.isQuickAiProcessing = false;
+
+                    if (resultText) {
+                        try {
+                            const cleanJson = resultText.replace(/```json/g, '').replace(/```/g, '').trim();
+                            const parsed = JSON.parse(cleanJson);
+
+                            if (parsed.title || parsed.action === 'add_task') {
+                                const newTask = {
+                                    id: Date.now(),
+                                    title: parsed.title || parsed.task?.title || "Nuovo lavoro AI",
+                                    environment: parsed.environment || "Interni / Muratura",
+                                    priority: parsed.priority || "P1",
+                                    status: "Non iniziata",
+                                    assignee: parsed.assignee || "Fai da te",
+                                    weather: parsed.weather || "Interno",
+                                    duration: parsed.duration || "1h",
+                                    dependsOn: null,
+                                    costEstimated: 0, costActual: 0, notes: "Aggiunto via Inserimento AI",
+                                    noMaterialsNeeded: true, materials: [], tools: [], subtasks: []
+                                };
+                                this.tasks.push(newTask);
+                                this.saveTasks();
+                                this.showToast(`✨ Aggiunto lavoro: "${newTask.title}"`);
+                            } else if (parsed.name || parsed.action === 'add_material') {
+                                const matName = parsed.name || parsed.material?.name;
+                                const targetTitle = parsed.taskTitle || parsed.task;
+                                let task = this.tasks.find(t => t.title.toLowerCase().includes((targetTitle || '').toLowerCase()));
+                                if (!task) task = this.tasks[0]; // Fallback primo lavoro
+                                
+                                if (task) {
+                                    if (!task.materials) task.materials = [];
+                                    task.materials.push({
+                                        name: matName || "Materiale",
+                                        quantity: parsed.quantity || parsed.material?.quantity || "1 pz",
+                                        store: parsed.store || parsed.material?.store || "Tecnomat / Leroy Merlin",
+                                        cost: parsed.cost || parsed.material?.cost || 0,
+                                        status: parsed.status || "Da comprare",
+                                        codeUrl: ""
+                                    });
+                                    task.noMaterialsNeeded = false;
+                                    this.saveTasks();
+                                    this.showToast(`✨ Aggiunto materiale "${matName}" a ${task.title}!`);
+                                }
+                            }
+                            this.showQuickAiModal = false;
+                            this.quickAiPrompt = '';
+                        } catch (e) {
+                            this.showToast("Frase non interpretata. Riprova con parole diverse.");
+                        }
+                    } else {
+                        this.showToast("Errore di risposta Gemini.");
+                    }
+                },
+
+                // Quick Material Modal Save
+                saveQuickMaterial() {
+                    if (!this.quickMat.name.trim() || !this.quickMat.taskId) return;
+                    const task = this.tasks.find(t => t.id === this.quickMat.taskId);
+                    if (task) {
+                        if (!task.materials) task.materials = [];
+                        task.materials.push({
+                            name: this.quickMat.name.trim(),
+                            quantity: this.quickMat.quantity.trim(),
+                            store: this.quickMat.store,
+                            cost: 0,
+                            status: 'Da comprare',
+                            codeUrl: this.quickMat.codeUrl.trim()
+                        });
+                        task.noMaterialsNeeded = false;
+                        this.saveTasks();
+                        this.showToast("Materiale aggiunto alla lista!");
+                    }
+                    this.showAddMaterialModal = false;
+                    this.quickMat = { taskId: null, name: '', quantity: '', store: 'Tecnomat / Leroy Merlin', codeUrl: '' };
+                },
+
+                cycleMaterialStatus(task, mat) {
+                    if (mat.status === 'Da comprare') mat.status = 'Ordinato';
+                    else if (mat.status === 'Ordinato') mat.status = 'In casa';
+                    else mat.status = 'Da comprare';
+                    this.saveTasks();
+                },
+
+                // WHATSAPP LIST COPY
+                copyWhatsAppList() {
+                    const storeName = this.spesaFilterStore;
+                    let text = `🛒 *LISTA SPESA CANTIERE CASA* (${storeName})\n\n`;
+                    
+                    if (this.allMaterialsFiltered.length === 0) {
+                        text += "Nessun articolo presente per questo filtro.";
+                    } else {
+                        this.allMaterialsFiltered.forEach((item, index) => {
+                            const q = item.material.quantity ? ` (${item.material.quantity})` : '';
+                            const code = item.material.codeUrl ? ` [${item.material.codeUrl}]` : '';
+                            text += `${index + 1}. *${item.material.name}*${q}${code} ➔ _${item.task.title}_\n`;
+                        });
+                        text += `\n💰 *Totale stimato:* € ${this.formatMoney(this.totalStoreEstimate)}`;
+                    }
+
+                    // Fallback copy for iframe environment
+                    const el = document.createElement('textarea');
+                    el.value = text;
+                    document.body.appendChild(el);
+                    el.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(el);
+
+                    this.showToast("📋 Lista spesa copiata! Incollala su WhatsApp.");
+                },
+
+                // Contractor methods
+                openNewContractorModal() {
+                    this.activeContractor = { id: Date.now(), name: '', role: 'Artigiano', phone: '', notes: '' };
+                },
+                editContractor(c) {
+                    this.activeContractor = JSON.parse(JSON.stringify(c));
+                },
+                saveContractorModal() {
+                    if (!this.activeContractor.name.trim()) return;
+                    const idx = this.contractors.findIndex(c => c.id === this.activeContractor.id);
+                    if (idx >= 0) this.contractors[idx] = this.activeContractor;
+                    else this.contractors.push(this.activeContractor);
+                    this.saveContractors();
+                    this.activeContractor = null;
+                    this.showToast("Ditta salvata in rubrica.");
+                },
+                deleteContractor(id) {
+                    if (confirm("Eliminare questa ditta dalla rubrica?")) {
+                        this.contractors = this.contractors.filter(c => c.id !== id);
+                        this.saveContractors();
+                        this.activeContractor = null;
+                    }
+                },
+                getTasksForContractor(role) {
+                    return this.tasks.filter(t => t.assignee === role);
+                },
+                cleanPhoneForWa(phone) {
+                    return (phone || '').replace(/[^0-9]/g, '');
+                },
+
+                resetFilters() {
+                    this.searchQuery = '';
+                    this.filterAssigneeGroup = 'Tutti';
+                    this.filterStatus = 'Tutti';
+                    this.filterPriority = 'Tutti';
+                    this.filterEnvironment = 'Tutti';
+                    this.filterWeather = 'Tutti';
+                    this.filterMaterialStatus = 'Tutti';
+                },
+
+                isUrl(str) {
+                    return str && (str.startsWith('http://') || str.startsWith('https://'));
+                },
+
+                formatMoney(val) {
+                    return Number(val || 0).toLocaleString('it-IT', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+                },
+
+                exportCSV() {
+                    let csv = "ID;Titolo;Ambiente;Priorita;Stato;Chi;Meteo;Durata;Preventivo;CostoEffettivo;Note\n";
+                    this.tasks.forEach(t => {
+                        csv += `"${t.id}";"${t.title}";"${t.environment}";"${t.priority}";"${t.status}";"${t.assignee}";"${t.weather}";"${t.duration || ''}";"${t.costEstimated || 0}";"${t.costActual || 0}";"${(t.notes || '').replace(/"/g, '""')}"\n`;
+                    });
+                    const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement("a");
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `CantiereCasa_v2_${new Date().toISOString().slice(0,10)}.csv`;
+                    link.click();
+                },
+
+                exportJSON() {
+                    const backupData = { tasks: this.tasks, contractors: this.contractors };
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(backupData, null, 2));
+                    const downloadAnchor = document.createElement('a');
+                    downloadAnchor.setAttribute("href", dataStr);
+                    downloadAnchor.setAttribute("download", `CantiereCasa_Backup_v2_${new Date().toISOString().slice(0,10)}.json`);
+                    document.body.appendChild(downloadAnchor);
+                    downloadAnchor.click();
+                    downloadAnchor.remove();
+                },
+
+                importJSON(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const imported = JSON.parse(e.target.result);
+                            if (imported.tasks && Array.isArray(imported.tasks)) {
+                                this.tasks = imported.tasks;
+                                if (imported.contractors) this.contractors = imported.contractors;
+                                this.saveTasks();
+                                this.saveContractors();
+                                this.showSettingsModal = false;
+                                this.showToast("Dati ripristinati con successo!");
+                            } else if (Array.isArray(imported)) {
+                                this.tasks = imported;
+                                this.saveTasks();
+                                this.showSettingsModal = false;
+                                this.showToast("Lavori ripristinati!");
+                            }
+                        } catch (err) {
+                            this.showToast("File JSON non valido.");
+                        }
+                    };
+                    reader.readAsText(file);
+                },
+
+                resetToDefaultData() {
+                    if (confirm("Vuoi davvero ripristinare i 34 lavori iniziali? Le modifiche locali andranno perse.")) {
+                        this.tasks = JSON.parse(JSON.stringify(INITIAL_TASKS));
+                        this.contractors = JSON.parse(JSON.stringify(INITIAL_CONTRACTORS));
+                        this.saveTasks();
+                        this.saveContractors();
+                        this.showSettingsModal = false;
+                        this.showToast("Dati iniziali ripristinati.");
+                    }
+                }
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
